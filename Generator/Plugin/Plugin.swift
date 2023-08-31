@@ -3,9 +3,10 @@ import Foundation
 
 @main struct CuckooPlugin: BuildToolPlugin {
     func createBuildCommands(context: PluginContext, target: Target) async throws -> [PackagePlugin.Command] {
-        let configPath = context.package.directory.appending("cuckoo.json")
+        let baseDir = context.package.directory
+        let configPath = baseDir.appending("cuckoo.json")
         let config = try await ConfigFile.decode(from: configPath)
-
+        
         let dependencies: [SourceModuleTarget] = target
             .dependencies
             .flatMap { dependency in
@@ -20,29 +21,73 @@ import Foundation
             }
             .compactMap { $0 as? SourceModuleTarget }
             .filter { $0.kind == .generic && $0.moduleName != "Cuckoo" }
-
+        
         let testableModules = dependencies
             .map(\.moduleName)
-            .joined(separator: ",")
-
-        let sources = dependencies
-            .flatMap(\.sourceFiles)
-            .filter { $0.type == .source }
-            .map(\.path)
-
-        let output = context.pluginWorkDirectory.appending("GeneratedMocks.swift")
-
+        
+        let inputFiles = collectInputFiles(
+            config: config,
+            dependencies: dependencies,
+            baseDir: baseDir
+        )
+        
+        let output = context
+            .pluginWorkDirectory
+            .appending("GeneratedMocks.swift")
+        
+        let buildArguments = collectBuildArguments(
+            output: output,
+            inputFiles: inputFiles,
+            testableModules: testableModules,
+            options: config.options ?? []
+        )
+        
         return [.buildCommand(
             displayName: "Run CuckooGenerator",
             executable: try context.tool(named: "CuckooGenerator").path,
-            arguments: [
-                "generate",
-                "--output", output,
-                "--testable", testableModules
-            ] + config.options + sources,
-            inputFiles: [configPath] + sources,
+            arguments: buildArguments,
+            inputFiles: [configPath] + inputFiles,
             outputFiles: [output]
         )]
+    }
+    
+    func collectBuildArguments(
+        output: PackagePlugin.Path,
+        inputFiles: [PackagePlugin.Path],
+        testableModules: [String],
+        options: [String]
+    ) -> [CustomStringConvertible] {
+        var buildArguments: [CustomStringConvertible] = [
+            "generate",
+            "--output", output
+        ]
+        if !testableModules.isEmpty {
+            buildArguments += ["--testable"]
+            buildArguments += testableModules
+        }
+        if !options.isEmpty { buildArguments += options }
+        buildArguments += inputFiles
+        return buildArguments
+    }
+    
+    func collectInputFiles(
+        config: ConfigFile,
+        dependencies: [SourceModuleTarget],
+        baseDir: Path
+    ) -> [PackagePlugin.Path] {
+        var sources: [PackagePlugin.Path] = []
+        if let inputFiles = config.inputFiles, 
+            inputFiles.count > 0 {
+            sources = inputFiles.map {
+                baseDir.appending($0)
+            }
+        } else {
+            sources = dependencies
+                .flatMap(\.sourceFiles)
+                .filter { $0.type == .source }
+                .map(\.path)
+        }
+        return sources
     }
 }
 
@@ -52,7 +97,10 @@ struct ConfigFile: Codable {
     }
 
     var version: Version = .v1
-    var options: [String] = []
+    var options: [String]?
+    
+    /// Relative to package directory
+    var inputFiles: [String]?
 
     static func decode(from path: Path) async throws -> Self {
         guard let data = try? await path.contents() else { return .init() }
