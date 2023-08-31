@@ -27,6 +27,11 @@ class TestedClass {
         return "a"
     }
 
+    var readOnlyPropertyWithJapaneseComment: String {
+        // 日本語コメント
+        return "a"
+    }
+
     @available(iOS 42.0, *)
     var unavailableProperty: UnavailableProtocol? {
         return nil
@@ -52,6 +57,18 @@ class TestedClass {
             : Int
         ) -> String
     ) -> () = { i in }
+
+    var asyncProperty: Int {
+        get async { 0 }
+    }
+
+    var asyncThrowsProperty: Int {
+        get async throws { 0 }
+    }
+
+    var throwsProperty: Int {
+        get throws { 0 }
+    }
 
     func noReturn() {
     }
