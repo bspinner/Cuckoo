@@ -30,6 +30,7 @@ import Foundation
             dependencies: dependencies,
             baseDir: baseDir
         )
+        validateFileExistence(paths: inputFiles)
         
         let output = context
             .pluginWorkDirectory
@@ -37,7 +38,7 @@ import Foundation
         
         let buildArguments = collectBuildArguments(
             output: output,
-            inputFiles: inputFiles,
+            inputFiles: Array(inputFiles),
             testableModules: testableModules,
             options: config.options ?? []
         )
@@ -74,7 +75,7 @@ import Foundation
         config: ConfigFile,
         dependencies: [SourceModuleTarget],
         baseDir: Path
-    ) -> [PackagePlugin.Path] {
+    ) -> Set<PackagePlugin.Path> {
         var sources: [PackagePlugin.Path] = []
         if let inputFiles = config.inputFiles, 
             inputFiles.count > 0 {
@@ -87,7 +88,34 @@ import Foundation
                 .filter { $0.type == .source }
                 .map(\.path)
         }
-        return sources
+        return Set(sources)
+    }
+    
+    /// Raises an fatalError if paths pointing to
+    /// one or more non-existant files have been provided.
+    func validateFileExistence(paths: Set<Path>) {
+        guard !paths.isEmpty else {
+            return
+        }
+        
+        let fileManager = FileManager()
+        let missingFiles = paths.filter { path in
+            !fileManager.fileExists(atPath: path.string)
+        }
+        
+        // Exit early if only valid paths have been detected
+        guard !missingFiles.isEmpty else {
+            return
+        }
+        
+        let errorMessage =
+            """
+            Invalid configuration detected!
+            Non-existing or inaccessible files:
+            \(missingFiles.map({ $0.string }).joined(separator: "\n"))
+            """
+
+        fatalError(errorMessage)
     }
 }
 
