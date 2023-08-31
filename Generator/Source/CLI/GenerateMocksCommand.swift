@@ -1,6 +1,5 @@
 import Foundation
 import Commandant
-import Result
 import SourceKittenFramework
 import FileKit
 
