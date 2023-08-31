@@ -19,7 +19,7 @@ let package = Package(
         .package(url: "https://github.com/jpsim/SourceKitten.git", .upToNextMinor(from: "0.34.1")),
         .package(url: "https://github.com/nvzqz/FileKit.git", branch: "develop"),
         .package(url: "https://github.com/kylef/Stencil.git", exact: "0.14.2"),
-        .package(url: "https://github.com/Carthage/Commandant.git", exact: "0.15.0"),
+        .package(url: "https://github.com/Carthage/Commandant.git", exact: "0.18.0"),
     ],
     targets: [
         .executableTarget(
